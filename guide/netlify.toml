@@ -1,5 +1,5 @@
 [build]
-  base = "frontend"
+  base = "guide/frontend"
   publish = "dist"
   command = "npm run build"
   functions = "../backend/functions"
@@ -18,9 +18,7 @@
   for = "/*"
   [headers.values]
     X-Frame-Options = "DENY"
-    X-XSS-Protection = "1; mode=block"
     X-Content-Type-Options = "nosniff"
-    Referrer-Policy = "strict-origin-when-cross-origin"
 
 [[headers]]
   for = "/assets/*"
