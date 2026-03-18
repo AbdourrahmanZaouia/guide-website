@@ -1,0 +1,56 @@
+.auth-page {
+  min-height: calc(100vh - 64px);
+  display: flex; align-items: center; justify-content: center;
+  padding: 48px 16px;
+  background: var(--cream);
+}
+.auth-card {
+  width: 100%; max-width: 440px;
+  background: var(--white); border: 1px solid var(--cream-dark);
+  border-radius: var(--radius-xl); padding: 40px;
+  box-shadow: var(--shadow-md);
+  animation: fadeIn 0.3s ease;
+}
+.auth-header { text-align: center; margin-bottom: 28px; }
+.auth-logo {
+  display: inline-flex; align-items: center; gap: 8px;
+  text-decoration: none; margin-bottom: 20px;
+}
+.auth-header h1 { font-size: 1.6rem; margin-bottom: 6px; }
+.auth-form { display: flex; flex-direction: column; gap: 0; }
+.auth-divider {
+  text-align: center; position: relative; margin: 20px 0;
+  color: var(--ink-faint); font-size: 0.8rem;
+}
+.auth-divider::before, .auth-divider::after {
+  content: ''; position: absolute; top: 50%;
+  width: calc(50% - 24px); height: 1px; background: var(--cream-dark);
+}
+.auth-divider::before { left: 0; }
+.auth-divider::after { right: 0; }
+.auth-switch {
+  text-align: center; font-size: 0.875rem;
+  color: var(--ink-muted); margin-top: 20px;
+}
+.auth-switch a { color: var(--accent); font-weight: 500; }
+
+.role-tabs {
+  display: flex; border: 1.5px solid var(--cream-dark);
+  border-radius: var(--radius-lg); padding: 4px;
+  margin-bottom: 24px;
+}
+.role-tab {
+  flex: 1; padding: 10px;
+  background: none; border: none; border-radius: 8px;
+  font-family: var(--font-body); font-size: 0.9rem;
+  color: var(--ink-muted); cursor: pointer; transition: all var(--transition);
+}
+.role-tab.active {
+  background: var(--accent); color: #fff; font-weight: 500;
+}
+
+.demo-hint {
+  margin-top: 20px; padding: 12px 14px;
+  background: var(--cream); border-radius: var(--radius-lg);
+  font-size: 0.8rem; color: var(--ink-muted); text-align: center;
+}

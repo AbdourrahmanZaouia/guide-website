@@ -1,0 +1,106 @@
+.upload-page { padding: 48px 0 80px; }
+.upload-success {
+  min-height: calc(100vh - 64px); display: flex;
+  align-items: center; justify-content: center; padding: 32px;
+  background: var(--cream);
+}
+.success-card {
+  max-width: 440px; background: var(--white); border: 1px solid var(--cream-dark);
+  border-radius: var(--radius-xl); padding: 48px; text-align: center;
+  box-shadow: var(--shadow-md);
+}
+.success-icon { font-size: 3rem; margin-bottom: 16px; }
+.success-card h2 { margin-bottom: 12px; }
+.success-card p { color: var(--ink-muted); margin-bottom: 28px; line-height: 1.6; }
+
+.upload-header { text-align: center; margin-bottom: 36px; }
+.upload-header h1 { margin-bottom: 8px; }
+
+.upload-steps {
+  display: flex; align-items: center; justify-content: center;
+  gap: 0; margin-bottom: 40px;
+}
+.upload-step {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 20px; font-size: 0.875rem; color: var(--ink-faint);
+  position: relative;
+}
+.upload-step + .upload-step::before {
+  content: ''; position: absolute; left: 0; top: 50%;
+  transform: translateY(-50%); width: 1px; height: 20px;
+  background: var(--cream-dark);
+}
+.upload-step.active { color: var(--ink); font-weight: 500; }
+.upload-step.done { color: var(--green); }
+.step-num {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--cream-dark); display: flex;
+  align-items: center; justify-content: center; font-size: 0.78rem; font-weight: 600;
+  flex-shrink: 0;
+}
+.upload-step.active .step-num { background: var(--accent); color: #fff; }
+.upload-step.done .step-num { background: var(--green-light); color: var(--green); }
+
+.upload-form { display: flex; flex-direction: column; gap: 0; }
+.upload-section {
+  background: var(--white); border: 1px solid var(--cream-dark);
+  border-radius: var(--radius-xl); padding: 32px;
+  display: flex; flex-direction: column; gap: 4px;
+}
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.textarea { resize: vertical; min-height: 100px; }
+.form-hint { font-size: 0.75rem; color: var(--ink-faint); margin-top: 4px; }
+.input-error { border-color: var(--accent) !important; }
+
+.dropzone {
+  border: 2px dashed var(--cream-dark); border-radius: var(--radius-xl);
+  padding: 40px; text-align: center; cursor: pointer;
+  transition: all var(--transition); display: flex;
+  flex-direction: column; align-items: center; gap: 10px;
+  font-size: 0.9rem; color: var(--ink-muted);
+  background: var(--cream);
+}
+.dropzone:hover, .dropzone.drag-over { border-color: var(--accent); background: var(--accent-light); }
+.dropzone.has-file { border-style: solid; border-color: var(--green); background: var(--green-light); }
+.dropzone-error { border-color: var(--accent); }
+.dropzone-icon { font-size: 2rem; }
+.file-icon { font-size: 2rem; }
+.file-name { font-weight: 500; font-size: 0.9rem; color: var(--ink); }
+
+.price-input-wrap { position: relative; }
+.price-prefix {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--ink-muted); font-weight: 500;
+}
+.price-input { padding-left: 28px; }
+.payout-preview {
+  padding: 12px 16px; background: var(--green-light);
+  border: 1.5px solid #b7e4c7; border-radius: var(--radius-lg);
+  font-weight: 600; color: var(--green); font-size: 1rem;
+}
+
+.toggle-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 16px; background: var(--cream); border-radius: var(--radius-lg);
+}
+.toggle { position: relative; display: inline-block; width: 44px; height: 24px; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider {
+  position: absolute; inset: 0; background: var(--cream-dark);
+  border-radius: 12px; cursor: pointer; transition: 0.2s;
+}
+.toggle-slider::before {
+  content: ''; position: absolute; height: 18px; width: 18px;
+  left: 3px; bottom: 3px; background: white; border-radius: 50%;
+  transition: 0.2s;
+}
+.toggle input:checked + .toggle-slider { background: var(--green); }
+.toggle input:checked + .toggle-slider::before { transform: translateX(20px); }
+
+.preview-card {
+  border: 1px solid var(--cream-dark); border-radius: var(--radius-xl); overflow: hidden;
+}
+.preview-cover {
+  height: 160px; display: flex; align-items: center; justify-content: center;
+}
+.preview-body { padding: 20px; }
