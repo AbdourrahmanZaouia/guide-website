@@ -1,8 +1,8 @@
 [build]
-  base = "frontend"
-  publish = "dist"
-  command = "npm run build"
-  functions = "../backend/functions"
+  base = "guide"
+  publish = "frontend/dist"
+  command = "cd backend && npm install && cd ../frontend && npm install && npm run build"
+  functions = "backend/functions"
 
 [[redirects]]
   from = "/*"
