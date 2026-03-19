@@ -1,23 +1,49 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
-import { GUIDES, CATEGORIES, getFeaturedGuides } from '../utils/data'
+import { supabase } from '../context/AuthContext'
 import GuideCard from '../components/GuideCard'
 import './Home.css'
 
+const CATEGORIES = [
+  'Handwerk & DIY', 'Kochen & Backen', 'Technik & Software',
+  'Business', 'Fitness & Gesundheit', 'Garten', 'Finanzen', 'Kreativität'
+]
+
 const STATS = [
-  { value: '12,000+', label: 'Anleitungen' },
-  { value: '85,000+', label: 'zufriedene Käufer' },
-  { value: '3,400+', label: 'Verkäufer' },
-  { value: '€2.4M', label: 'ausgezahlt' },
+  { value: '100%', label: 'Echte Anleitungen' },
+  { value: '85%', label: 'Für Verkäufer' },
+  { value: '14 Tage', label: 'Rückgaberecht' },
+  { value: '€0', label: 'Registrierung' },
 ]
 
 const HOW = [
-  { step: '01', title: 'Entdecke', desc: 'Durchsuche tausende Anleitungen in allen Kategorien — von DIY bis Business.' },
+  { step: '01', title: 'Entdecke', desc: 'Durchsuche Anleitungen in allen Kategorien — von DIY bis Business.' },
   { step: '02', title: 'Kaufe sicher', desc: 'Sichere Zahlung via Stripe, Visa, PayPal, SEPA oder Klarna.' },
   { step: '03', title: 'Sofort-Download', desc: 'Nach dem Kauf lädst du die PDF oder DOCX sofort herunter.' },
 ]
 
 export default function Home() {
-  const featured = getFeaturedGuides()
+  const [featured, setFeatured] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { loadFeatured() }, [])
+
+  const loadFeatured = async () => {
+    try {
+      const { data } = await supabase
+        .from('guides')
+        .select('*')
+        .eq('active', true)
+        .order('downloads', { ascending: false })
+        .limit(4)
+
+      setFeatured(data || [])
+    } catch (err) {
+      console.error('Fehler:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="home">
@@ -58,7 +84,7 @@ export default function Home() {
       <section className="categories-strip section-sm">
         <div className="container">
           <div className="categories-scroll">
-            {CATEGORIES.slice(1).map(cat => (
+            {CATEGORIES.map(cat => (
               <Link key={cat} to={`/browse?cat=${encodeURIComponent(cat)}`} className="cat-chip">
                 {cat}
               </Link>
@@ -73,13 +99,34 @@ export default function Home() {
           <div className="section-header">
             <div>
               <h2>Beliebte Anleitungen</h2>
-              <p className="text-muted" style={{marginTop: 6}}>Handverlesen von unserem Team</p>
+              <p className="text-muted" style={{marginTop: 6}}>Die meistgekauften Guides</p>
             </div>
             <Link to="/browse" className="btn btn-outline btn-sm">Alle ansehen →</Link>
           </div>
-          <div className="grid-4">
-            {featured.map(g => <GuideCard key={g.id} guide={g} />)}
-          </div>
+
+          {loading ? (
+            <div className="grid-4">
+              {[1,2,3,4].map(i => (
+                <div key={i} className="card" style={{height: 320}}>
+                  <div className="skeleton" style={{height: 140}}></div>
+                  <div style={{padding: 18}}>
+                    <div className="skeleton" style={{height: 16, marginBottom: 8, borderRadius: 4}}></div>
+                    <div className="skeleton" style={{height: 12, marginBottom: 6, borderRadius: 4, width: '80%'}}></div>
+                    <div className="skeleton" style={{height: 12, borderRadius: 4, width: '60%'}}></div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : featured.length > 0 ? (
+            <div className="grid-4">
+              {featured.map(g => <GuideCard key={g.id} guide={g} isReal={true} />)}
+            </div>
+          ) : (
+            <div style={{textAlign:'center', padding:'48px 0', color:'var(--ink-muted)'}}>
+              <p style={{fontSize:'1.1rem', marginBottom:16}}>Noch keine Anleitungen verfügbar.</p>
+              <Link to="/upload" className="btn btn-primary">Erste Anleitung hochladen</Link>
+            </div>
+          )}
         </div>
       </section>
 
@@ -111,7 +158,7 @@ export default function Home() {
               <p>Lade deine Anleitung hoch und verdiene Geld. Du behältst 85% jedes Verkaufs — wir kümmern uns um Zahlungen, Hosting und Support.</p>
               <div style={{display: 'flex', gap: 12, flexWrap: 'wrap', marginTop: 24}}>
                 <Link to="/signup" className="btn btn-primary btn-lg">Kostenlos starten</Link>
-                <a href="#" className="btn btn-outline btn-lg" style={{borderColor: 'rgba(255,255,255,0.3)', color: '#fff'}}>Mehr erfahren</a>
+                <Link to="/browse" className="btn btn-outline btn-lg" style={{borderColor: 'rgba(255,255,255,0.3)', color: '#fff'}}>Anleitungen entdecken</Link>
               </div>
             </div>
             <div className="sell-cta-visual">
