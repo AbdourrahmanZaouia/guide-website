@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { supabase } from '../context/AuthContext'
 import { CATEGORIES } from '../utils/data'
 import './Upload.css'
 
@@ -12,9 +13,10 @@ export default function Upload() {
   const [success, setSuccess] = useState(false)
   const [form, setForm] = useState({
     title: '', description: '', longDescription: '',
-    category: '', price: '', tags: '', file: null, previewAllowed: true
+    category: '', price: '', tags: '', previewAllowed: true
   })
   const [dragOver, setDragOver] = useState(false)
+  const [file, setFile] = useState(null)
   const [errors, setErrors] = useState({})
 
   useEffect(() => { if (!user) navigate('/login', { state: { from: '/upload' } }) }, [user])
@@ -28,7 +30,7 @@ export default function Upload() {
     if (!form.description.trim()) e.description = 'Beschreibung ist erforderlich'
     if (!form.category) e.category = 'Kategorie wählen'
     if (!form.price || isNaN(form.price) || +form.price <= 0) e.price = 'Gültigen Preis eingeben'
-    if (!form.file) e.file = 'Bitte Datei hochladen'
+    if (!file) e.file = 'Bitte Datei hochladen'
     setErrors(e)
     return Object.keys(e).length === 0
   }
@@ -37,15 +39,53 @@ export default function Upload() {
     e.preventDefault()
     if (!validate()) return
     setSubmitting(true)
-    await new Promise(r => setTimeout(r, 1800))
-    setSubmitting(false)
-    setSuccess(true)
+
+    try {
+      // 1. Datei in Supabase Storage hochladen
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('guides')
+        .upload(fileName, file)
+
+      if (uploadError) throw uploadError
+
+      // 2. Anleitung in Datenbank speichern
+      const tagsArray = form.tags.split(',').map(t => t.trim()).filter(Boolean)
+
+      const { error: dbError } = await supabase
+        .from('guides')
+        .insert({
+          title: form.title,
+          description: form.description,
+          long_description: form.longDescription,
+          category: form.category,
+          price: parseFloat(form.price),
+          tags: tagsArray,
+          author_id: user.id,
+          author_name: user.name,
+          format: fileExt.toUpperCase(),
+          cover_color: '#f0d4c2',
+          icon: '📄',
+          active: false
+        })
+
+      if (dbError) throw dbError
+
+      setSuccess(true)
+    } catch (err) {
+      console.error('Upload Fehler:', err)
+      setErrors({ submit: 'Fehler beim Hochladen: ' + err.message })
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleDrop = (e) => {
     e.preventDefault(); setDragOver(false)
-    const file = e.dataTransfer.files[0]
-    if (file && (file.type === 'application/pdf' || file.name.endsWith('.docx'))) set('file', file)
+    const f = e.dataTransfer.files[0]
+    if (f && (f.type === 'application/pdf' || f.name.endsWith('.docx'))) setFile(f)
     else setErrors(ev => ({...ev, file: 'Nur PDF oder DOCX erlaubt'}))
   }
 
@@ -57,7 +97,7 @@ export default function Upload() {
         <p>Deine Anleitung wird innerhalb von 24h von unserem Team geprüft. Du erhältst eine E-Mail sobald sie live ist.</p>
         <div style={{display:'flex', gap:12, justifyContent:'center'}}>
           <button className="btn btn-primary" onClick={() => navigate('/dashboard')}>Dashboard öffnen</button>
-          <button className="btn btn-outline" onClick={() => { setSuccess(false); setForm({ title:'', description:'', longDescription:'', category:'', price:'', tags:'', file:null, previewAllowed:true }); setStep(1) }}>
+          <button className="btn btn-outline" onClick={() => { setSuccess(false); setForm({ title:'', description:'', longDescription:'', category:'', price:'', tags:'', previewAllowed:true }); setFile(null); setStep(1) }}>
             Weitere hochladen
           </button>
         </div>
@@ -73,7 +113,6 @@ export default function Upload() {
           <p className="text-muted">Du verdienst 85% jedes Verkaufs — wir kümmern uns um den Rest.</p>
         </div>
 
-        {/* Steps */}
         <div className="upload-steps">
           {['Details', 'Datei & Preis', 'Vorschau'].map((s, i) => (
             <div key={s} className={`upload-step ${step === i+1 ? 'active' : ''} ${step > i+1 ? 'done' : ''}`}>
@@ -84,7 +123,6 @@ export default function Upload() {
         </div>
 
         <form onSubmit={handleSubmit} className="upload-form">
-          {/* Step 1 */}
           {step === 1 && (
             <div className="upload-section fade-in">
               <div className="form-group">
@@ -93,24 +131,20 @@ export default function Upload() {
                   placeholder="z.B. Holzregal selbst bauen — Komplettanleitung"
                   value={form.title} onChange={e => set('title', e.target.value)} />
                 {errors.title && <p className="form-error">{errors.title}</p>}
-                <p className="form-hint">{form.title.length}/100 Zeichen · Beschreibender Titel = mehr Käufer</p>
               </div>
-
               <div className="form-group">
                 <label>Kurzbeschreibung *</label>
                 <textarea className={`input textarea ${errors.description?'input-error':''}`}
-                  placeholder="Was lernen Käufer? Was ist enthalten? Für wen ist es geeignet?"
+                  placeholder="Was lernen Käufer? Was ist enthalten?"
                   rows={4} value={form.description} onChange={e => set('description', e.target.value)} />
                 {errors.description && <p className="form-error">{errors.description}</p>}
               </div>
-
               <div className="form-group">
                 <label>Detaillierte Beschreibung (optional)</label>
                 <textarea className="input textarea"
                   placeholder="Inhaltsverzeichnis, Kapitel, besondere Features…"
                   rows={6} value={form.longDescription} onChange={e => set('longDescription', e.target.value)} />
               </div>
-
               <div className="form-row">
                 <div className="form-group">
                   <label>Kategorie *</label>
@@ -128,32 +162,36 @@ export default function Upload() {
                     value={form.tags} onChange={e => set('tags', e.target.value)} />
                 </div>
               </div>
-
               <button type="button" className="btn btn-primary btn-full"
-                onClick={() => { const e={}; if(!form.title.trim())e.title='Pflichtfeld'; if(!form.description.trim())e.description='Pflichtfeld'; if(!form.category)e.category='Pflichtfeld'; if(Object.keys(e).length){setErrors(e)}else{setStep(2);setErrors({})} }}>
+                onClick={() => {
+                  const e={}
+                  if(!form.title.trim()) e.title='Pflichtfeld'
+                  if(!form.description.trim()) e.description='Pflichtfeld'
+                  if(!form.category) e.category='Pflichtfeld'
+                  if(Object.keys(e).length){ setErrors(e) } else { setStep(2); setErrors({}) }
+                }}>
                 Weiter →
               </button>
             </div>
           )}
 
-          {/* Step 2 */}
           {step === 2 && (
             <div className="upload-section fade-in">
               <div className="form-group">
                 <label>Datei hochladen (PDF oder DOCX) *</label>
                 <div
-                  className={`dropzone ${dragOver?'drag-over':''} ${form.file?'has-file':''} ${errors.file?'dropzone-error':''}`}
+                  className={`dropzone ${dragOver?'drag-over':''} ${file?'has-file':''} ${errors.file?'dropzone-error':''}`}
                   onDragOver={e=>{e.preventDefault();setDragOver(true)}}
                   onDragLeave={()=>setDragOver(false)}
                   onDrop={handleDrop}
                   onClick={()=>document.getElementById('file-input').click()}
                 >
-                  {form.file ? (
+                  {file ? (
                     <>
                       <div className="file-icon">📄</div>
-                      <div className="file-name">{form.file.name}</div>
-                      <div className="text-faint" style={{fontSize:'0.8rem'}}>{(form.file.size/1024/1024).toFixed(2)} MB</div>
-                      <button type="button" className="btn btn-ghost btn-sm" onClick={e=>{e.stopPropagation();set('file',null)}}>Entfernen</button>
+                      <div className="file-name">{file.name}</div>
+                      <div className="text-faint" style={{fontSize:'0.8rem'}}>{(file.size/1024/1024).toFixed(2)} MB</div>
+                      <button type="button" className="btn btn-ghost btn-sm" onClick={e=>{e.stopPropagation();setFile(null)}}>Entfernen</button>
                     </>
                   ) : (
                     <>
@@ -164,7 +202,7 @@ export default function Upload() {
                   )}
                 </div>
                 <input id="file-input" type="file" accept=".pdf,.docx" style={{display:'none'}}
-                  onChange={e => set('file', e.target.files[0])} />
+                  onChange={e => setFile(e.target.files[0])} />
                 {errors.file && <p className="form-error">{errors.file}</p>}
               </div>
 
@@ -181,7 +219,7 @@ export default function Upload() {
                 </div>
                 <div className="form-group">
                   <label>Deine Auszahlung</label>
-                  <div className="payout-preview">
+                  <div className="payout-box">
                     {form.price && !isNaN(form.price) && +form.price > 0
                       ? `€${(+form.price * 0.85).toFixed(2).replace('.',',')} pro Verkauf`
                       : '—'}
@@ -190,28 +228,23 @@ export default function Upload() {
                 </div>
               </div>
 
-              <div className="toggle-row">
-                <div>
-                  <div style={{fontWeight:500, fontSize:'0.9rem'}}>Vorschau erlauben</div>
-                  <div className="text-faint" style={{fontSize:'0.8rem'}}>Erste Seiten für Käufer sichtbar</div>
-                </div>
-                <label className="toggle">
-                  <input type="checkbox" checked={form.previewAllowed} onChange={e=>set('previewAllowed', e.target.checked)} />
-                  <span className="toggle-slider"></span>
-                </label>
-              </div>
+              {errors.submit && <div className="alert alert-error">{errors.submit}</div>}
 
               <div style={{display:'flex', gap:12}}>
                 <button type="button" className="btn btn-outline" onClick={()=>setStep(1)}>← Zurück</button>
                 <button type="button" className="btn btn-primary" style={{flex:1}}
-                  onClick={()=>{ const e={}; if(!form.price||isNaN(form.price)||+form.price<=0)e.price='Gültigen Preis'; if(!form.file)e.file='Datei hochladen'; if(Object.keys(e).length){setErrors(e)}else{setStep(3);setErrors({})} }}>
+                  onClick={()=>{
+                    const e={}
+                    if(!form.price||isNaN(form.price)||+form.price<=0) e.price='Gültigen Preis'
+                    if(!file) e.file='Datei hochladen'
+                    if(Object.keys(e).length){ setErrors(e) } else { setStep(3); setErrors({}) }
+                  }}>
                   Weiter →
                 </button>
               </div>
             </div>
           )}
 
-          {/* Step 3 - Preview & Submit */}
           {step === 3 && (
             <div className="upload-section fade-in">
               <div className="preview-card">
@@ -224,7 +257,7 @@ export default function Upload() {
                   <p style={{fontSize:'0.875rem', color:'var(--ink-muted)', lineHeight:1.6}}>{form.description}</p>
                   <div style={{marginTop:16, display:'flex', justifyContent:'space-between', alignItems:'center'}}>
                     <span className="price">€{(+form.price).toFixed(2).replace('.',',')}</span>
-                    <span className="text-faint" style={{fontSize:'0.8rem'}}>{form.file?.name}</span>
+                    <span className="text-faint" style={{fontSize:'0.8rem'}}>{file?.name}</span>
                   </div>
                 </div>
               </div>
@@ -236,7 +269,7 @@ export default function Upload() {
               <div style={{display:'flex', gap:12, marginTop:20}}>
                 <button type="button" className="btn btn-outline" onClick={()=>setStep(2)}>← Zurück</button>
                 <button type="submit" className="btn btn-primary" style={{flex:1}} disabled={submitting}>
-                  {submitting ? 'Wird eingereicht…' : '🚀 Anleitung einreichen'}
+                  {submitting ? 'Wird hochgeladen…' : '🚀 Anleitung einreichen'}
                 </button>
               </div>
             </div>
