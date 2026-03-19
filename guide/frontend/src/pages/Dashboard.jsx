@@ -1,19 +1,69 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { GUIDES } from '../utils/data'
+import { supabase } from '../context/AuthContext'
 import './Dashboard.css'
 
 export default function Dashboard() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
+  const [myGuides, setMyGuides] = useState([])
+  const [purchases, setPurchases] = useState([])
+  const [totalEarnings, setTotalEarnings] = useState(0)
+  const [totalSales, setTotalSales] = useState(0)
+  const [loading, setLoading] = useState(true)
 
-  useEffect(() => { if (!user) navigate('/login', { state: { from: '/dashboard' } }) }, [user])
+  useEffect(() => {
+    if (!user) { navigate('/login', { state: { from: '/dashboard' } }); return }
+    loadData()
+  }, [user])
+
+  const loadData = async () => {
+    setLoading(true)
+    try {
+      // Eigene Anleitungen laden
+      const { data: guides } = await supabase
+        .from('guides')
+        .select('*')
+        .eq('author_id', user.id)
+        .order('created_at', { ascending: false })
+
+      setMyGuides(guides || [])
+
+      // Käufe laden
+      const { data: purchaseData } = await supabase
+        .from('purchases')
+        .select('*, guides(*)')
+        .eq('buyer_id', user.id)
+        .order('created_at', { ascending: false })
+
+      setPurchases(purchaseData || [])
+
+      // Einnahmen berechnen
+      const { data: salesData } = await supabase
+        .from('purchases')
+        .select('price_paid, guides!inner(author_id)')
+        .eq('guides.author_id', user.id)
+
+      if (salesData) {
+        const total = salesData.reduce((sum, s) => sum + (s.price_paid * 0.85), 0)
+        setTotalEarnings(total)
+        setTotalSales(salesData.length)
+      }
+    } catch (err) {
+      console.error('Fehler beim Laden:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
   if (!user) return null
 
-  const myGuides = GUIDES.slice(0, 2)
-  const purchases = GUIDES.slice(2, 5)
-  const totalEarnings = myGuides.reduce((s, g) => s + g.price * 12, 0) * 0.85
+  if (loading) return (
+    <div style={{display:'flex', alignItems:'center', justifyContent:'center', minHeight:'60vh'}}>
+      <p style={{color:'var(--ink-muted)'}}>Laden…</p>
+    </div>
+  )
 
   return (
     <div className="dashboard">
@@ -34,9 +84,9 @@ export default function Dashboard() {
         {/* Stats */}
         <div className="dash-stats">
           {[
-            { label: 'Gesamteinnahmen', value: `€${totalEarnings.toFixed(2).replace('.',',')}`, sub: '+12% diesen Monat', color: 'var(--accent)' },
-            { label: 'Verkaufte Anleitungen', value: '24', sub: '8 diesen Monat', color: 'var(--green)' },
-            { label: 'Eigene Anleitungen', value: myGuides.length, sub: '1 in Review', color: '#5a3e99' },
+            { label: 'Gesamteinnahmen', value: `€${totalEarnings.toFixed(2).replace('.',',')}`, sub: '85% deiner Verkäufe', color: 'var(--accent)' },
+            { label: 'Verkaufte Anleitungen', value: totalSales, sub: 'Gesamt', color: 'var(--green)' },
+            { label: 'Eigene Anleitungen', value: myGuides.length, sub: 'Hochgeladen', color: '#5a3e99' },
             { label: 'Käufe', value: purchases.length, sub: 'Alle verfügbar', color: '#0369a1' },
           ].map(s => (
             <div key={s.label} className="dash-stat-card">
@@ -48,7 +98,7 @@ export default function Dashboard() {
         </div>
 
         <div className="dash-grid">
-          {/* My guides */}
+          {/* Meine Anleitungen */}
           <div className="dash-section">
             <div className="dash-section-header">
               <h2>Meine Anleitungen</h2>
@@ -63,18 +113,17 @@ export default function Dashboard() {
               <div className="dash-guide-list">
                 {myGuides.map(g => (
                   <div key={g.id} className="dash-guide-row">
-                    <div className="dash-guide-cover" style={{background: g.coverColor}}>
-                      <span style={{fontSize:'1.4rem'}}>{g.icon}</span>
+                    <div className="dash-guide-cover" style={{background: g.cover_color || '#f0d4c2'}}>
+                      <span style={{fontSize:'1.4rem'}}>{g.icon || '📄'}</span>
                     </div>
                     <div className="dash-guide-info">
-                      <Link to={`/guide/${g.id}`} className="dash-guide-title">{g.title}</Link>
+                      <span className="dash-guide-title">{g.title}</span>
                       <div className="dash-guide-meta text-faint">
-                        {g.format} · {g.downloads} Downloads · €{(g.price * 0.85).toFixed(2).replace('.',',')} / Verkauf
+                        {g.format} · {g.downloads || 0} Downloads · €{((g.price || 0) * 0.85).toFixed(2).replace('.',',')} / Verkauf
                       </div>
                     </div>
                     <div className="dash-guide-actions">
                       <span className="badge badge-new">Aktiv</span>
-                      <button className="btn btn-ghost btn-sm">Bearbeiten</button>
                     </div>
                   </div>
                 ))}
@@ -82,34 +131,41 @@ export default function Dashboard() {
             )}
           </div>
 
-          {/* Purchases */}
+          {/* Meine Käufe */}
           <div className="dash-section">
             <div className="dash-section-header">
               <h2>Meine Käufe</h2>
             </div>
-            <div className="dash-guide-list">
-              {purchases.map(g => (
-                <div key={g.id} className="dash-guide-row">
-                  <div className="dash-guide-cover" style={{background: g.coverColor}}>
-                    <span style={{fontSize:'1.4rem'}}>{g.icon}</span>
+            {purchases.length === 0 ? (
+              <div className="dash-empty">
+                <p>Noch keine Anleitungen gekauft.</p>
+                <Link to="/browse" className="btn btn-primary btn-sm">Anleitungen entdecken</Link>
+              </div>
+            ) : (
+              <div className="dash-guide-list">
+                {purchases.map(p => (
+                  <div key={p.id} className="dash-guide-row">
+                    <div className="dash-guide-cover" style={{background: p.guides?.cover_color || '#e6f1fb'}}>
+                      <span style={{fontSize:'1.4rem'}}>{p.guides?.icon || '📄'}</span>
+                    </div>
+                    <div className="dash-guide-info">
+                      <span className="dash-guide-title">{p.guides?.title}</span>
+                      <div className="dash-guide-meta text-faint">{p.guides?.format} · {p.guides?.pages} Seiten</div>
+                    </div>
+                    <button className="btn btn-sm btn-outline">
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
+                      </svg>
+                      Download
+                    </button>
                   </div>
-                  <div className="dash-guide-info">
-                    <Link to={`/guide/${g.id}`} className="dash-guide-title">{g.title}</Link>
-                    <div className="dash-guide-meta text-faint">{g.format} · {g.pages} Seiten</div>
-                  </div>
-                  <button className="btn btn-sm btn-outline">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>
-                    </svg>
-                    Download
-                  </button>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </div>
         </div>
 
-        {/* Account */}
+        {/* Konto */}
         <div className="dash-section dash-account">
           <h2>Konto-Einstellungen</h2>
           <div className="account-grid">
