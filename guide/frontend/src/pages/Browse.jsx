@@ -1,8 +1,13 @@
-import { useState, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import { GUIDES, CATEGORIES } from '../utils/data'
+import { supabase } from '../context/AuthContext'
 import GuideCard from '../components/GuideCard'
 import './Browse.css'
+
+const CATEGORIES = [
+  'Alle', 'Handwerk & DIY', 'Kochen & Backen', 'Technik & Software',
+  'Business', 'Fitness & Gesundheit', 'Garten', 'Finanzen', 'Kreativität'
+]
 
 const SORT_OPTIONS = [
   { value: 'popular', label: 'Beliebtheit' },
@@ -16,47 +21,69 @@ export default function Browse() {
   const [searchParams, setSearchParams] = useSearchParams()
   const [search, setSearch] = useState('')
   const [sort, setSort] = useState('popular')
+  const [guides, setGuides] = useState([])
+  const [loading, setLoading] = useState(true)
   const activeCategory = searchParams.get('cat') || 'Alle'
 
+  useEffect(() => { loadGuides() }, [activeCategory, sort])
+
+  const loadGuides = async () => {
+    setLoading(true)
+    try {
+      let query = supabase
+        .from('guides')
+        .select('*')
+        .eq('active', true)
+
+      if (activeCategory !== 'Alle') {
+        query = query.eq('category', activeCategory)
+      }
+
+      switch (sort) {
+        case 'newest': query = query.order('created_at', { ascending: false }); break
+        case 'price-asc': query = query.order('price', { ascending: true }); break
+        case 'price-desc': query = query.order('price', { ascending: false }); break
+        case 'rating': query = query.order('rating', { ascending: false }); break
+        default: query = query.order('downloads', { ascending: false })
+      }
+
+      const { data, error } = await query
+      if (error) throw error
+      setGuides(data || [])
+    } catch (err) {
+      console.error('Fehler beim Laden:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const filtered = guides.filter(g => {
+    if (!search.trim()) return true
+    const q = search.toLowerCase()
+    return (
+      g.title?.toLowerCase().includes(q) ||
+      g.description?.toLowerCase().includes(q) ||
+      g.author_name?.toLowerCase().includes(q) ||
+      g.tags?.some(t => t.toLowerCase().includes(q))
+    )
+  })
+
   const setCategory = (cat) => {
-    if (cat === 'Alle') { searchParams.delete('cat') } 
+    if (cat === 'Alle') { searchParams.delete('cat') }
     else { searchParams.set('cat', cat) }
     setSearchParams(searchParams)
   }
 
-  const filtered = useMemo(() => {
-    let result = [...GUIDES]
-    if (activeCategory !== 'Alle') result = result.filter(g => g.category === activeCategory)
-    if (search.trim()) {
-      const q = search.toLowerCase()
-      result = result.filter(g =>
-        g.title.toLowerCase().includes(q) ||
-        g.description.toLowerCase().includes(q) ||
-        g.author.toLowerCase().includes(q) ||
-        g.tags.some(t => t.toLowerCase().includes(q))
-      )
-    }
-    switch (sort) {
-      case 'newest': return result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-      case 'price-asc': return result.sort((a, b) => a.price - b.price)
-      case 'price-desc': return result.sort((a, b) => b.price - a.price)
-      case 'rating': return result.sort((a, b) => b.rating - a.rating)
-      default: return result.sort((a, b) => b.downloads - a.downloads)
-    }
-  }, [activeCategory, search, sort])
-
   return (
     <div className="browse-page">
-      {/* Header */}
       <div className="browse-header">
         <div className="container">
           <h1>Anleitungen entdecken</h1>
-          <p className="text-muted">{GUIDES.length} Anleitungen von verifizierten Experten</p>
+          <p className="text-muted">Anleitungen von verifizierten Experten</p>
         </div>
       </div>
 
       <div className="container">
-        {/* Search & Sort */}
         <div className="browse-controls">
           <div className="search-wrap">
             <svg className="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -73,7 +100,6 @@ export default function Browse() {
           </select>
         </div>
 
-        {/* Categories */}
         <div className="browse-cats">
           {CATEGORIES.map(cat => (
             <button
@@ -86,23 +112,36 @@ export default function Browse() {
           ))}
         </div>
 
-        {/* Results */}
         <div className="browse-results-header">
           <span className="text-muted" style={{fontSize: '0.875rem'}}>
-            {filtered.length} Ergebnisse {activeCategory !== 'Alle' ? `in "${activeCategory}"` : ''}
+            {loading ? 'Laden…' : `${filtered.length} Anleitungen`}
+            {activeCategory !== 'Alle' ? ` in "${activeCategory}"` : ''}
             {search && ` für "${search}"`}
           </span>
         </div>
 
-        {filtered.length > 0 ? (
+        {loading ? (
           <div className="grid-4 browse-grid">
-            {filtered.map(g => <GuideCard key={g.id} guide={g} />)}
+            {[1,2,3,4].map(i => (
+              <div key={i} className="card" style={{height: 320}}>
+                <div className="skeleton" style={{height: 140}}></div>
+                <div style={{padding: 18}}>
+                  <div className="skeleton" style={{height: 16, marginBottom: 8, borderRadius: 4}}></div>
+                  <div className="skeleton" style={{height: 12, marginBottom: 6, borderRadius: 4, width: '80%'}}></div>
+                  <div className="skeleton" style={{height: 12, borderRadius: 4, width: '60%'}}></div>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : filtered.length > 0 ? (
+          <div className="grid-4 browse-grid">
+            {filtered.map(g => <GuideCard key={g.id} guide={g} isReal={true} />)}
           </div>
         ) : (
           <div className="empty-state">
             <div className="empty-icon">🔍</div>
             <h3>Keine Anleitungen gefunden</h3>
-            <p>Versuch einen anderen Suchbegriff oder eine andere Kategorie.</p>
+            <p>{guides.length === 0 ? 'Noch keine Anleitungen verfügbar. Sei der Erste und lade eine hoch!' : 'Versuch einen anderen Suchbegriff.'}</p>
             <button className="btn btn-secondary" onClick={() => { setSearch(''); setCategory('Alle') }}>
               Filter zurücksetzen
             </button>
